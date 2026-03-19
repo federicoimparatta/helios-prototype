@@ -18,9 +18,9 @@ import {
 import { dataCenters, agents, users, auditLogs } from "@/lib/mock-data";
 
 const stats = [
-  { label: "Total Sites", value: 4, icon: Building2, color: "bg-navy", textColor: "text-navy" },
-  { label: "Total Users", value: 6, icon: Users, color: "bg-blue", textColor: "text-blue" },
-  { label: "Active Agents", value: 3, icon: Bot, color: "bg-teal", textColor: "text-teal" },
+  { label: "Total Sites", value: dataCenters.length, icon: Building2, color: "bg-navy", textColor: "text-navy" },
+  { label: "Total Users", value: users.length, icon: Users, color: "bg-blue", textColor: "text-blue" },
+  { label: "Active Agents", value: agents.filter((a) => a.status === "active").length, icon: Bot, color: "bg-teal", textColor: "text-teal" },
   { label: "Pending Reviews", value: 2, icon: ClipboardCheck, color: "bg-amber-500", textColor: "text-amber-600" },
 ];
 
@@ -292,9 +292,9 @@ export default function AdminDashboard() {
         {/* Quick Actions */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {[
-            { label: "Manage Users", href: "/admin/users", icon: Users, desc: "Add, edit, or remove platform users" },
-            { label: "Onboard New Site", href: "/admin/onboard", icon: Building2, desc: "Start the 6-step onboarding wizard" },
-            { label: "View All Audit Logs", href: "/dc/dc-site-001/audit", icon: FileText, desc: "Full audit trail across all sites" },
+            { label: "Manage Users", href: "/admin/users", icon: Users, desc: "Users, roles, permissions, vendor access" },
+            { label: "Org Hierarchy", href: "/admin/hierarchy", icon: Building2, desc: "Define org structure and permission scoping" },
+            { label: "Onboard New Site", href: "/admin/onboard", icon: Building2, desc: "6-step wizard with ontology & RBAC setup" },
           ].map((action) => {
             const Icon = action.icon;
             return (
@@ -327,12 +327,14 @@ function RoleBadge({ role }: { role: string }) {
     super_admin: "bg-purple-100 text-purple-700",
     org_admin: "bg-blue-100 text-blue-700",
     dc_admin: "bg-teal/10 text-teal-dark",
+    shift_lead: "bg-amber-100 text-amber-700",
     operator: "bg-emerald-100 text-emerald-700",
     viewer: "bg-slate-100 text-slate-600",
+    vendor_service: "bg-orange-100 text-orange-700",
   };
   return (
     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${colors[role] || "bg-slate-100 text-slate-600"}`}>
-      {role.replace("_", " ")}
+      {role.replace(/_/g, " ")}
     </span>
   );
 }
