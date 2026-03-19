@@ -12,15 +12,19 @@ import {
   MessageSquare,
   ChevronDown,
   LogOut,
-  Settings,
   User,
+  Settings,
+  GitBranch,
 } from "lucide-react";
 import ChatPanel from "@/components/ChatPanel";
+import { AuthProvider, useAuth } from "@/lib/auth-context";
+import { roleLabels } from "@/lib/mock-data";
 
 function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [chatOpen, setChatOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const { currentUser, hasPermission, isVendor } = useAuth();
 
   // Don't render shell on login page
   const isLoginPage = pathname === "/login";
@@ -28,11 +32,29 @@ function AppShell({ children }: { children: React.ReactNode }) {
     return <>{children}</>;
   }
 
+  const initials = currentUser.name
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .slice(0, 2);
+
+  // Build nav links based on permissions
   const navLinks = [
-    { href: "/dc", label: "Sites", icon: Building2 },
-    { href: "/admin/users", label: "Admin", icon: Shield },
-    { href: "/search", label: "Search", icon: Search },
-  ];
+    { href: "/dc", label: "Sites", icon: Building2, show: true },
+    { href: "/admin", label: "Admin", icon: Shield, show: hasPermission("admin") },
+    { href: "/admin/hierarchy", label: "Hierarchy", icon: GitBranch, show: hasPermission("admin") },
+    { href: "/search", label: "Search", icon: Search, show: !isVendor },
+  ].filter((l) => l.show);
+
+  const roleBadgeColor: Record<string, string> = {
+    super_admin: "bg-purple-500/20 text-purple-200",
+    org_admin: "bg-blue-500/20 text-blue-200",
+    dc_admin: "bg-teal/20 text-teal-light",
+    shift_lead: "bg-amber-500/20 text-amber-200",
+    operator: "bg-emerald-500/20 text-emerald-200",
+    viewer: "bg-slate-500/20 text-slate-300",
+    vendor_service: "bg-orange-500/20 text-orange-200",
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -79,15 +101,27 @@ function AppShell({ children }: { children: React.ReactNode }) {
           </nav>
         </div>
 
-        {/* Right: User Avatar */}
+        {/* Right: User Avatar + Role */}
         <div className="flex items-center gap-3">
+          {/* Scope indicator */}
+          {isVendor && (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-orange-500/20 text-orange-200 text-[10px] font-medium border border-orange-500/30">
+              SERVICE MODE
+            </span>
+          )}
           <div className="relative">
             <button
               onClick={() => setUserMenuOpen(!userMenuOpen)}
-              className="flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-white/10 transition-colors"
+              className="flex items-center gap-2.5 px-2 py-1 rounded-lg hover:bg-white/10 transition-colors"
             >
               <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-teal to-teal-dark flex items-center justify-center text-white text-xs font-bold shadow-md">
-                FI
+                {initials}
+              </div>
+              <div className="hidden sm:block text-left">
+                <p className="text-white text-xs font-medium leading-tight">{currentUser.name}</p>
+                <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase tracking-wider ${roleBadgeColor[currentUser.role] || "bg-slate-500/20 text-slate-300"}`}>
+                  {roleLabels[currentUser.role] || currentUser.role}
+                </span>
               </div>
               <ChevronDown
                 className={`w-3.5 h-3.5 text-white/40 transition-transform ${userMenuOpen ? "rotate-180" : ""}`}
@@ -101,14 +135,22 @@ function AppShell({ children }: { children: React.ReactNode }) {
                   className="fixed inset-0 z-10"
                   onClick={() => setUserMenuOpen(false)}
                 />
-                <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-xl shadow-xl border border-gray-200 py-2 z-20">
+                <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-xl shadow-xl border border-gray-200 py-2 z-20">
                   <div className="px-4 py-2 border-b border-gray-100 mb-1">
                     <p className="text-sm font-semibold text-gray-900">
-                      Federico Imparatta
+                      {currentUser.name}
                     </p>
                     <p className="text-xs text-gray-400">
-                      federico.imparatta@us.q-cells.com
+                      {currentUser.email}
                     </p>
+                    <div className="flex items-center gap-1.5 mt-1.5">
+                      <span className="text-[10px] text-gray-500 font-medium">Scope:</span>
+                      <span className="text-[10px] text-gray-700 font-semibold capitalize">
+                        {currentUser.scopeLevel}
+                        {currentUser.scopeLevel === "site" && ` — ${currentUser.sites.length} site${currentUser.sites.length > 1 ? "s" : ""}`}
+                        {currentUser.scopeLevel === "device" && ` — ${currentUser.scopedDevices?.length || 0} devices`}
+                      </span>
+                    </div>
                   </div>
                   <button className="w-full flex items-center gap-2.5 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 transition-colors">
                     <User className="w-4 h-4" />
@@ -125,7 +167,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
                       onClick={() => setUserMenuOpen(false)}
                     >
                       <LogOut className="w-4 h-4" />
-                      Sign Out
+                      Switch User / Sign Out
                     </Link>
                   </div>
                 </div>
@@ -140,13 +182,15 @@ function AppShell({ children }: { children: React.ReactNode }) {
         <div className="p-6 max-w-[1400px] mx-auto">{children}</div>
       </main>
 
-      {/* Floating Chat Button */}
-      <button
-        onClick={() => setChatOpen(true)}
-        className={`fixed bottom-6 right-6 z-30 w-14 h-14 bg-gradient-to-br from-teal to-teal-dark text-white rounded-2xl shadow-lg shadow-teal/30 hover:shadow-xl hover:shadow-teal/40 hover:scale-105 transition-all flex items-center justify-center ${chatOpen ? "hidden" : ""}`}
-      >
-        <MessageSquare className="w-6 h-6" />
-      </button>
+      {/* Floating Chat Button — hidden for vendors */}
+      {!isVendor && (
+        <button
+          onClick={() => setChatOpen(true)}
+          className={`fixed bottom-6 right-6 z-30 w-14 h-14 bg-gradient-to-br from-teal to-teal-dark text-white rounded-2xl shadow-lg shadow-teal/30 hover:shadow-xl hover:shadow-teal/40 hover:scale-105 transition-all flex items-center justify-center ${chatOpen ? "hidden" : ""}`}
+        >
+          <MessageSquare className="w-6 h-6" />
+        </button>
+      )}
 
       {/* Chat Panel */}
       <ChatPanel isOpen={chatOpen} onClose={() => setChatOpen(false)} />
@@ -162,7 +206,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="antialiased">
-        <AppShell>{children}</AppShell>
+        <AuthProvider>
+          <AppShell>{children}</AppShell>
+        </AuthProvider>
       </body>
     </html>
   );

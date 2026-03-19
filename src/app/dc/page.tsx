@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { dataCenters } from "@/lib/mock-data";
+import { useAuth } from "@/lib/auth-context";
 import {
   Zap,
   Gauge,
@@ -13,29 +14,72 @@ import {
   Battery,
   Building2,
   ArrowRight,
+  ShieldAlert,
+  Lock,
+  Eye,
+  Bot,
+  Wrench,
 } from "lucide-react";
 
 export default function DataCentersPage() {
-  const totalPower = dataCenters.reduce(
-    (sum, dc) => sum + dc.metrics.power,
-    0
-  );
-  const avgPUE =
-    dataCenters.reduce((sum, dc) => sum + dc.metrics.pue, 0) /
-    dataCenters.length;
-  const siteCount = dataCenters.length;
+  const { currentUser, canAccessSite, isVendor, hasPermission } = useAuth();
+
+  // Filter sites based on user scope
+  const accessibleSites = dataCenters.filter((dc) => canAccessSite(dc.id));
+  const inaccessibleSites = dataCenters.filter((dc) => !canAccessSite(dc.id));
+
+  const totalPower = accessibleSites.reduce((sum, dc) => sum + dc.metrics.power, 0);
+  const avgPUE = accessibleSites.length > 0
+    ? accessibleSites.reduce((sum, dc) => sum + dc.metrics.pue, 0) / accessibleSites.length
+    : 0;
+  const siteCount = accessibleSites.length;
 
   return (
     <div className="min-h-screen">
       {/* Page Header */}
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-gray-900">
-          Data Center Operations
+          {isVendor ? "Service Portal" : "Data Center Operations"}
         </h1>
         <p className="text-gray-500 text-sm mt-1">
-          Monitor and manage all site operations across your portfolio
+          {isVendor
+            ? `Viewing assigned devices at ${siteCount} site${siteCount !== 1 ? "s" : ""}`
+            : `Monitor and manage ${currentUser.scopeLevel === "portfolio" ? "all" : "your assigned"} site operations`}
         </p>
       </div>
+
+      {/* Scope Banner for non-admin users */}
+      {currentUser.role !== "super_admin" && (
+        <div className="mb-6 bg-navy/5 border border-navy/10 rounded-xl p-4 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-navy/10 flex items-center justify-center shrink-0">
+            {isVendor ? (
+              <Wrench className="w-5 h-5 text-navy" />
+            ) : currentUser.permissions.includes("read") && !currentUser.permissions.includes("write") ? (
+              <Eye className="w-5 h-5 text-navy" />
+            ) : (
+              <ShieldAlert className="w-5 h-5 text-navy" />
+            )}
+          </div>
+          <div className="flex-1">
+            <p className="text-sm font-medium text-slate-800">
+              {isVendor
+                ? `Service access — ${currentUser.scopedDevices?.length || 0} assigned devices`
+                : `Scope: ${currentUser.scopeLevel.charAt(0).toUpperCase() + currentUser.scopeLevel.slice(1)} level — ${siteCount} site${siteCount !== 1 ? "s" : ""}`}
+            </p>
+            <p className="text-xs text-slate-500 mt-0.5">
+              {isVendor
+                ? "View-only telemetry for assigned devices. Export and download are disabled."
+                : `Permissions: ${currentUser.permissions.join(", ")}`}
+            </p>
+          </div>
+          {currentUser.agentPermissions.length > 0 && (
+            <div className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue/10 border border-blue/20">
+              <Bot className="w-3.5 h-3.5 text-blue" />
+              <span className="text-[11px] font-medium text-blue">Agent Access</span>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Summary Bar */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
@@ -74,16 +118,21 @@ export default function DataCentersPage() {
           </div>
           <div>
             <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">
-              Active Sites
+              {isVendor ? "Assigned Sites" : "Accessible Sites"}
             </p>
-            <p className="text-2xl font-bold text-gray-900">{siteCount}</p>
+            <p className="text-2xl font-bold text-gray-900">
+              {siteCount}
+              {!isVendor && currentUser.role !== "super_admin" && (
+                <span className="text-sm font-normal text-gray-400"> / {dataCenters.length}</span>
+              )}
+            </p>
           </div>
         </div>
       </div>
 
-      {/* Site Cards Grid */}
+      {/* Accessible Site Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-2 gap-5">
-        {dataCenters.map((dc) => (
+        {accessibleSites.map((dc) => (
           <Link
             key={dc.id}
             href={`/dc/${dc.id}`}
@@ -109,7 +158,7 @@ export default function DataCentersPage() {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                {dc.reviewNeeded && (
+                {dc.reviewNeeded && hasPermission("approve") && (
                   <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-orange-50 text-orange-600 border border-orange-200">
                     <AlertTriangle className="w-3 h-3" />
                     Review Needed
@@ -193,6 +242,34 @@ export default function DataCentersPage() {
           </Link>
         ))}
       </div>
+
+      {/* Inaccessible Sites (shown as locked cards) */}
+      {inaccessibleSites.length > 0 && (
+        <div className="mt-8">
+          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
+            Outside your scope ({inaccessibleSites.length} site{inaccessibleSites.length !== 1 ? "s" : ""})
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-2 gap-4">
+            {inaccessibleSites.map((dc) => (
+              <div
+                key={dc.id}
+                className="bg-slate-50 rounded-xl border border-slate-200 p-5 opacity-50 cursor-not-allowed"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-slate-200 flex items-center justify-center">
+                    <Lock className="w-5 h-5 text-slate-400" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-slate-500">{dc.name}</h3>
+                    <p className="text-xs text-slate-400">{dc.location} — Access restricted</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+

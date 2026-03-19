@@ -1,7 +1,17 @@
+/* ─────────────────────────────────────────────────────────────
+   Mock Data — Updated for 5 Use Cases
+   UC1: RBAC by Org Hierarchy
+   UC2: Custom Org Hierarchy per Customer
+   UC3: Device-Level Telemetry Access Control
+   UC4: Agent Identity and Authorization
+   UC5: Ontology-Driven Hierarchy Instantiation
+   ───────────────────────────────────────────────────────────── */
+
+// ── Data Centers ──────────────────────────────────────────────
 export const dataCenters = [
   {
     id: "dc-site-001",
-    name: "DC Site 001 (Atlanta)",
+    name: "DC-East-01 (Atlanta)",
     location: "Atlanta, GA",
     lat: 33.749,
     lng: -84.388,
@@ -12,7 +22,7 @@ export const dataCenters = [
   },
   {
     id: "dc-site-002",
-    name: "DC Site 002 (Dallas)",
+    name: "DC-South-01 (Dallas)",
     location: "Dallas, TX",
     lat: 32.776,
     lng: -96.797,
@@ -23,7 +33,7 @@ export const dataCenters = [
   },
   {
     id: "dc-site-003",
-    name: "DC Site 003 (Phoenix)",
+    name: "DC-West-01 (Phoenix)",
     location: "Phoenix, AZ",
     lat: 33.448,
     lng: -112.074,
@@ -34,7 +44,7 @@ export const dataCenters = [
   },
   {
     id: "dc-site-004",
-    name: "DC Site 004 (Chicago)",
+    name: "DC-East-02 (Chicago)",
     location: "Chicago, IL",
     lat: 41.878,
     lng: -87.629,
@@ -45,38 +55,351 @@ export const dataCenters = [
   },
 ];
 
+// ── UC2: Custom Org Hierarchy ─────────────────────────────────
+export interface OrgHierarchyNode {
+  id: string;
+  label: string;
+  level: string;
+  parent: string | null;
+  dcId?: string; // maps to dataCenters[].id when level=Site
+}
+
+export interface OrgHierarchy {
+  id: string;
+  name: string;
+  customer: string;
+  levels: string[];
+  nodes: OrgHierarchyNode[];
+}
+
+export const orgHierarchy: OrgHierarchy = {
+  id: "helios-demo",
+  name: "Helios Data Centers",
+  customer: "Helios",
+  levels: ["Portfolio", "Region", "Site"],
+  nodes: [
+    { id: "portfolio", label: "Helios Portfolio", level: "Portfolio", parent: null },
+    { id: "region-west", label: "US-West", level: "Region", parent: "portfolio" },
+    { id: "region-east", label: "US-East", level: "Region", parent: "portfolio" },
+    { id: "region-south", label: "US-South", level: "Region", parent: "portfolio" },
+    { id: "dc-west-01", label: "DC-West-01 (Phoenix)", level: "Site", parent: "region-west", dcId: "dc-site-003" },
+    { id: "dc-east-01", label: "DC-East-01 (Atlanta)", level: "Site", parent: "region-east", dcId: "dc-site-001" },
+    { id: "dc-east-02", label: "DC-East-02 (Chicago)", level: "Site", parent: "region-east", dcId: "dc-site-004" },
+    { id: "dc-south-01", label: "DC-South-01 (Dallas)", level: "Site", parent: "region-south", dcId: "dc-site-002" },
+  ],
+};
+
+export const exampleHierarchies = [
+  {
+    customer: "AWS",
+    levels: ["Global", "Region", "Availability Zone"],
+    example: "Global > US-West-2 > us-west-2a",
+    description: "Airport-code regions with lettered availability zones",
+  },
+  {
+    customer: "Microsoft Azure",
+    levels: ["Geography", "Region", "Availability Zone"],
+    example: "Americas > West US 2 > Zone 1",
+    description: "Metro-based regions with numbered zones",
+  },
+  {
+    customer: "Equinix",
+    levels: ["Portfolio", "Metro", "Campus", "Building"],
+    example: "Americas > Dallas > DA > DA11",
+    description: "Flat portfolio with metro/campus/building hierarchy",
+  },
+  {
+    customer: "Custom Colo",
+    levels: ["Portfolio", "Site"],
+    example: "MyPortfolio > Site-A",
+    description: "Flat two-level hierarchy for single-tenant colo",
+  },
+];
+
+// ── UC1/UC3/UC4: Users with Permissions ───────────────────────
+export type PermissionLevel = "read" | "write" | "admin" | "approve" | "service_view" | "agent_interact";
+export type AgentPermission =
+  | "approve_recommendations"
+  | "schedule_actions"
+  | "configure_agents"
+  | "view_agent_activity"
+  | "trigger_agent";
+export type UserRole =
+  | "super_admin"
+  | "org_admin"
+  | "dc_admin"
+  | "shift_lead"
+  | "operator"
+  | "viewer"
+  | "vendor_service";
+
+export const users = [
+  {
+    id: "u1",
+    name: "Federico Imparatta",
+    email: "federico.imparatta@us.q-cells.com",
+    role: "super_admin" as UserRole,
+    scopeLevel: "portfolio" as const,
+    scopeNode: "portfolio",
+    sites: ["dc-site-001", "dc-site-002", "dc-site-003", "dc-site-004"],
+    permissions: ["read", "write", "admin", "approve", "agent_interact"] as PermissionLevel[],
+    agentPermissions: ["approve_recommendations", "schedule_actions", "configure_agents", "view_agent_activity", "trigger_agent"] as AgentPermission[],
+    scopedDevices: null as string[] | null,
+    description: "Full platform access across all sites and agents",
+  },
+  {
+    id: "u2",
+    name: "Sarah Kim",
+    email: "sarah.kim@us.q-cells.com",
+    role: "shift_lead" as UserRole,
+    scopeLevel: "site" as const,
+    scopeNode: "dc-west-01",
+    sites: ["dc-site-003"],
+    permissions: ["read", "write", "approve", "agent_interact"] as PermissionLevel[],
+    agentPermissions: ["approve_recommendations", "schedule_actions", "view_agent_activity"] as AgentPermission[],
+    scopedDevices: null as string[] | null,
+    description: "Shift Lead at DC-West-01 with approval authority",
+  },
+  {
+    id: "u3",
+    name: "Mike Chen",
+    email: "mike.chen@us.q-cells.com",
+    role: "dc_admin" as UserRole,
+    scopeLevel: "site" as const,
+    scopeNode: "dc-east-01",
+    sites: ["dc-site-001"],
+    permissions: ["read", "write", "admin", "agent_interact"] as PermissionLevel[],
+    agentPermissions: ["approve_recommendations", "configure_agents", "view_agent_activity"] as AgentPermission[],
+    scopedDevices: null as string[] | null,
+    description: "DC Admin for Atlanta site",
+  },
+  {
+    id: "u4",
+    name: "James Lee",
+    email: "james.lee@us.q-cells.com",
+    role: "operator" as UserRole,
+    scopeLevel: "region" as const,
+    scopeNode: "region-east",
+    sites: ["dc-site-001", "dc-site-004"],
+    permissions: ["read", "write"] as PermissionLevel[],
+    agentPermissions: ["view_agent_activity"] as AgentPermission[],
+    scopedDevices: null as string[] | null,
+    description: "Operator across US-East region",
+  },
+  {
+    id: "u5",
+    name: "Maria Gonzalez",
+    email: "maria.gonzalez@us.q-cells.com",
+    role: "dc_admin" as UserRole,
+    scopeLevel: "site" as const,
+    scopeNode: "dc-south-01",
+    sites: ["dc-site-002"],
+    permissions: ["read", "write", "admin", "agent_interact"] as PermissionLevel[],
+    agentPermissions: ["approve_recommendations", "view_agent_activity"] as AgentPermission[],
+    scopedDevices: null as string[] | null,
+    description: "DC Admin for Dallas site",
+  },
+  {
+    id: "u6",
+    name: "Tom Wilson",
+    email: "tom.wilson@us.q-cells.com",
+    role: "viewer" as UserRole,
+    scopeLevel: "site" as const,
+    scopeNode: "dc-west-01",
+    sites: ["dc-site-003"],
+    permissions: ["read"] as PermissionLevel[],
+    agentPermissions: [] as AgentPermission[],
+    scopedDevices: null as string[] | null,
+    description: "Read-only viewer for Phoenix site",
+  },
+  {
+    id: "u7",
+    name: "TechCool Solutions",
+    email: "service@techcool-hvac.com",
+    role: "vendor_service" as UserRole,
+    scopeLevel: "device" as const,
+    scopeNode: "dc-east-01",
+    sites: ["dc-site-001"],
+    permissions: ["service_view"] as PermissionLevel[],
+    agentPermissions: [] as AgentPermission[],
+    scopedDevices: ["chiller-1", "chiller-2", "ct-1"],
+    description: "HVAC vendor — view-only access to assigned chillers & cooling towers",
+  },
+  {
+    id: "u8",
+    name: "PowerGrid Maintenance",
+    email: "ops@powergrid-maint.com",
+    role: "vendor_service" as UserRole,
+    scopeLevel: "device" as const,
+    scopeNode: "dc-east-01",
+    sites: ["dc-site-001"],
+    permissions: ["service_view"] as PermissionLevel[],
+    agentPermissions: [] as AgentPermission[],
+    scopedDevices: ["ups-1", "ups-2", "bess-1"],
+    description: "Electrical vendor — view-only access to UPS & BESS units",
+  },
+];
+
+export const roleLabels: Record<UserRole, string> = {
+  super_admin: "Super Admin",
+  org_admin: "Org Admin",
+  dc_admin: "DC Admin",
+  shift_lead: "Shift Lead",
+  operator: "Operator",
+  viewer: "Viewer",
+  vendor_service: "Vendor / Service",
+};
+
+export const permissionDescriptions: Record<PermissionLevel, string> = {
+  read: "View dashboards, telemetry, and reports",
+  write: "Modify setpoints, create SOPs, update configurations",
+  admin: "Manage users, configure sites, modify hierarchy",
+  approve: "Approve/reject recommendations and scheduled actions",
+  service_view: "View assigned device telemetry only (no export/download)",
+  agent_interact: "Interact with AI agents, trigger and approve agent actions",
+};
+
+// ── UC4: Agent Authorization Model ───────────────────────────
+export interface AgentAuthConfig {
+  agentId: string;
+  permissionLevel: "monitor" | "advisory" | "autonomous";
+  requiresApproval: string[];
+  autoApproved: string[];
+  scope: string; // site, region, portfolio
+}
+
+export const agentAuthConfigs: AgentAuthConfig[] = [
+  {
+    agentId: "agent-sop",
+    permissionLevel: "advisory",
+    requiresApproval: ["execute_sop", "modify_sop", "override_safety_boundary"],
+    autoApproved: ["recommend_sop", "validate_preconditions", "monitor_safety_boundaries", "version_management"],
+    scope: "site",
+  },
+  {
+    agentId: "agent-health",
+    permissionLevel: "monitor",
+    requiresApproval: ["create_maintenance_ticket", "trigger_emergency_shutdown"],
+    autoApproved: ["read_telemetry", "compute_health_score", "detect_anomaly", "generate_alert", "predict_failure"],
+    scope: "site",
+  },
+  {
+    agentId: "agent-planner",
+    permissionLevel: "advisory",
+    requiresApproval: ["apply_optimization", "modify_setpoints", "dispatch_bess", "adjust_chiller_sequence"],
+    autoApproved: ["generate_plan", "compute_savings", "risk_assessment", "ingest_market_data", "weather_forecast"],
+    scope: "site",
+  },
+];
+
+// ── UC5: Ontology Sources ─────────────────────────────────────
+export interface OntologySource {
+  id: string;
+  type: "electrical_sld" | "mechanical_layout" | "bms" | "epms" | "sops";
+  format: string;
+  filename: string;
+  status: "uploaded" | "processing" | "mapped" | "connected" | "error";
+  pointsMapped: number;
+  totalPoints: number;
+  lastSync?: string;
+}
+
+export const ontologySources: OntologySource[] = [
+  {
+    id: "onto-1",
+    type: "electrical_sld",
+    format: "AutoCAD DWG",
+    filename: "DC-East-01-Electrical-SLD.dwg",
+    status: "mapped",
+    pointsMapped: 48,
+    totalPoints: 52,
+  },
+  {
+    id: "onto-2",
+    type: "mechanical_layout",
+    format: "PDF",
+    filename: "DC-East-01-HVAC-FloorPlan.pdf",
+    status: "mapped",
+    pointsMapped: 35,
+    totalPoints: 38,
+  },
+  {
+    id: "onto-3",
+    type: "bms",
+    format: "BACnet/IP",
+    filename: "bacnet://192.168.1.100:47808",
+    status: "connected",
+    pointsMapped: 156,
+    totalPoints: 160,
+    lastSync: "2026-03-19T16:30:00Z",
+  },
+  {
+    id: "onto-4",
+    type: "epms",
+    format: "Modbus TCP",
+    filename: "modbus://192.168.1.200:502",
+    status: "connected",
+    pointsMapped: 72,
+    totalPoints: 75,
+    lastSync: "2026-03-19T16:30:00Z",
+  },
+];
+
+export const ontologyMappingSteps = [
+  { step: 1, label: "Upload As-Builts", description: "Import electrical SLD and mechanical layout drawings (PDF, DWG, SVG)" },
+  { step: 2, label: "Parse & Extract", description: "AI extracts equipment topology, connection paths, and nameplate data from drawings" },
+  { step: 3, label: "Connect Telemetry", description: "Map BMS/EPMS data points to extracted equipment nodes via protocol adapters" },
+  { step: 4, label: "Validate & Activate", description: "Verify live readings on each node, confirm topology matches physical plant" },
+];
+
+// ── Knowledge Graph ───────────────────────────────────────────
 export const knowledgeGraphNodes = [
-  { id: "site", label: "DC Site 001", type: "site", x: 400, y: 50 },
-  { id: "ups-1", label: "UPS-1", type: "ups", x: 150, y: 170, status: "normal" },
-  { id: "ups-2", label: "UPS-2", type: "ups", x: 350, y: 170, status: "normal" },
-  { id: "gen-1", label: "Generator-1", type: "generator", x: 550, y: 170, status: "standby" },
-  { id: "bess-1", label: "BESS-1", type: "bess", x: 700, y: 170, status: "charging" },
-  { id: "pdu-1", label: "PDU-A1", type: "pdu", x: 100, y: 310, status: "normal" },
-  { id: "pdu-2", label: "PDU-A2", type: "pdu", x: 250, y: 310, status: "normal" },
-  { id: "pdu-3", label: "PDU-B1", type: "pdu", x: 400, y: 310, status: "normal" },
-  { id: "chiller-1", label: "Chiller-1", type: "chiller", x: 550, y: 310, status: "normal" },
-  { id: "chiller-2", label: "Chiller-2", type: "chiller", x: 700, y: 310, status: "warning" },
-  { id: "ct-1", label: "Cooling Tower-1", type: "cooling_tower", x: 625, y: 440, status: "normal" },
-  { id: "ahu-1", label: "AHU-1", type: "ahu", x: 100, y: 440, status: "normal" },
-  { id: "ahu-2", label: "AHU-2", type: "ahu", x: 250, y: 440, status: "normal" },
-  { id: "ahu-3", label: "AHU-3", type: "ahu", x: 400, y: 440, status: "normal" },
-  { id: "zone-1", label: "Zone A (Cold)", type: "zone", x: 100, y: 570, status: "normal" },
-  { id: "zone-2", label: "Zone B (Hot)", type: "zone", x: 250, y: 570, status: "warning" },
-  { id: "zone-3", label: "Zone C (Cold)", type: "zone", x: 400, y: 570, status: "normal" },
+  { id: "site", label: "DC-East-01", type: "site", x: 400, y: 50, ontologySource: "as-built" },
+  { id: "utility", label: "Utility Feed", type: "utility", x: 400, y: -30, status: "normal", ontologySource: "electrical_sld" },
+  { id: "ups-1", label: "UPS-1", type: "ups", x: 150, y: 170, status: "normal", ontologySource: "electrical_sld", telemetrySource: "epms" },
+  { id: "ups-2", label: "UPS-2", type: "ups", x: 350, y: 170, status: "normal", ontologySource: "electrical_sld", telemetrySource: "epms" },
+  { id: "gen-1", label: "Generator-1", type: "generator", x: 550, y: 170, status: "standby", ontologySource: "electrical_sld", telemetrySource: "epms" },
+  { id: "bess-1", label: "BESS-1", type: "bess", x: 700, y: 170, status: "charging", ontologySource: "electrical_sld", telemetrySource: "epms" },
+  { id: "pdu-1", label: "PDU-A1", type: "pdu", x: 100, y: 310, status: "normal", ontologySource: "electrical_sld", telemetrySource: "epms" },
+  { id: "pdu-2", label: "PDU-A2", type: "pdu", x: 250, y: 310, status: "normal", ontologySource: "electrical_sld", telemetrySource: "epms" },
+  { id: "pdu-3", label: "PDU-B1", type: "pdu", x: 400, y: 310, status: "normal", ontologySource: "electrical_sld", telemetrySource: "epms" },
+  { id: "chiller-1", label: "Chiller-1", type: "chiller", x: 550, y: 310, status: "normal", ontologySource: "mechanical_layout", telemetrySource: "bms" },
+  { id: "chiller-2", label: "Chiller-2", type: "chiller", x: 700, y: 310, status: "warning", ontologySource: "mechanical_layout", telemetrySource: "bms" },
+  { id: "ct-1", label: "Cooling Tower-1", type: "cooling_tower", x: 625, y: 440, status: "normal", ontologySource: "mechanical_layout", telemetrySource: "bms" },
+  { id: "ahu-1", label: "AHU-1", type: "ahu", x: 100, y: 440, status: "normal", ontologySource: "mechanical_layout", telemetrySource: "bms" },
+  { id: "ahu-2", label: "AHU-2", type: "ahu", x: 250, y: 440, status: "normal", ontologySource: "mechanical_layout", telemetrySource: "bms" },
+  { id: "ahu-3", label: "AHU-3", type: "ahu", x: 400, y: 440, status: "normal", ontologySource: "mechanical_layout", telemetrySource: "bms" },
+  { id: "zone-1", label: "Zone A (Cold)", type: "zone", x: 100, y: 570, status: "normal", ontologySource: "mechanical_layout" },
+  { id: "zone-2", label: "Zone B (Hot)", type: "zone", x: 250, y: 570, status: "warning", ontologySource: "mechanical_layout" },
+  { id: "zone-3", label: "Zone C (Cold)", type: "zone", x: 400, y: 570, status: "normal", ontologySource: "mechanical_layout" },
+  { id: "it-load", label: "IT Load", type: "it_load", x: 250, y: 440, status: "normal", ontologySource: "electrical_sld" },
 ];
 
 export const knowledgeGraphEdges = [
-  { from: "site", to: "ups-1" }, { from: "site", to: "ups-2" },
-  { from: "site", to: "gen-1" }, { from: "site", to: "bess-1" },
-  { from: "ups-1", to: "pdu-1" }, { from: "ups-1", to: "pdu-2" },
-  { from: "ups-2", to: "pdu-3" },
-  { from: "site", to: "chiller-1" }, { from: "site", to: "chiller-2" },
-  { from: "chiller-1", to: "ct-1" }, { from: "chiller-2", to: "ct-1" },
-  { from: "site", to: "ahu-1" }, { from: "site", to: "ahu-2" }, { from: "site", to: "ahu-3" },
-  { from: "ahu-1", to: "zone-1" }, { from: "ahu-2", to: "zone-2" }, { from: "ahu-3", to: "zone-3" },
-  { from: "chiller-1", to: "ahu-1" }, { from: "chiller-1", to: "ahu-2" }, { from: "chiller-2", to: "ahu-3" },
+  { from: "utility", to: "site", relationship: "feeds" },
+  { from: "site", to: "ups-1", relationship: "distributes" },
+  { from: "site", to: "ups-2", relationship: "distributes" },
+  { from: "site", to: "gen-1", relationship: "backup" },
+  { from: "site", to: "bess-1", relationship: "storage" },
+  { from: "ups-1", to: "pdu-1", relationship: "feeds" },
+  { from: "ups-1", to: "pdu-2", relationship: "feeds" },
+  { from: "ups-2", to: "pdu-3", relationship: "feeds" },
+  { from: "site", to: "chiller-1", relationship: "cools" },
+  { from: "site", to: "chiller-2", relationship: "cools" },
+  { from: "chiller-1", to: "ct-1", relationship: "rejects_heat" },
+  { from: "chiller-2", to: "ct-1", relationship: "rejects_heat" },
+  { from: "site", to: "ahu-1", relationship: "serves" },
+  { from: "site", to: "ahu-2", relationship: "serves" },
+  { from: "site", to: "ahu-3", relationship: "serves" },
+  { from: "ahu-1", to: "zone-1", relationship: "conditions" },
+  { from: "ahu-2", to: "zone-2", relationship: "conditions" },
+  { from: "ahu-3", to: "zone-3", relationship: "conditions" },
+  { from: "chiller-1", to: "ahu-1", relationship: "chilled_water" },
+  { from: "chiller-1", to: "ahu-2", relationship: "chilled_water" },
+  { from: "chiller-2", to: "ahu-3", relationship: "chilled_water" },
 ];
 
+// ── Assets ────────────────────────────────────────────────────
 export const assets = [
   {
     id: "ups-1", name: "UPS-1", type: "UPS", parentId: "site",
@@ -98,8 +421,17 @@ export const assets = [
     id: "ct-1", name: "Cooling Tower-1", type: "Cooling Tower", parentId: "site",
     telemetry: { cwSupplyTemp: 82.4, cwReturnTemp: 92.1, fanSpeed: 65, approachTemp: 7.2, basinTemp: 81.8 },
   },
+  {
+    id: "chiller-2", name: "Chiller-2", type: "Chiller", parentId: "site",
+    telemetry: { coolingCapacity: 1200, chwSupplyTemp: 45.1, chwReturnTemp: 55.3, compressorPower: 355, cop: 3.38, flowRate: 470 },
+  },
+  {
+    id: "ups-2", name: "UPS-2", type: "UPS", parentId: "site",
+    telemetry: { activePower: 920, voltage: 480, current: 1917, loadPercent: 74, batteryTemp: 24.8, runtime: 38 },
+  },
 ];
 
+// ── Optimization Data ─────────────────────────────────────────
 export function generateOptimizationData() {
   const hours = Array.from({ length: 24 }, (_, i) => `${i.toString().padStart(2, "0")}:00`);
   const itLoad = [3200, 3150, 3100, 3050, 3000, 3050, 3200, 3500, 3800, 4100, 4250, 4300, 4350, 4300, 4250, 4100, 3900, 3700, 3500, 3400, 3350, 3300, 3250, 3200];
@@ -118,6 +450,7 @@ export function generateOptimizationData() {
   }));
 }
 
+// ── SOPs ──────────────────────────────────────────────────────
 export const sops = [
   {
     id: "sop-001", title: "Chiller Switchover Procedure", version: "3.2",
@@ -133,7 +466,7 @@ export const sops = [
   {
     id: "sop-002", title: "BESS Emergency Discharge", version: "1.4",
     status: "active" as const, category: "Electrical",
-    lastUpdated: "2026-03-05", author: "Sarah Park",
+    lastUpdated: "2026-03-05", author: "Sarah Kim",
     safetyBoundaries: [
       { param: "Cell Temperature", min: 15, max: 45, unit: "°C" },
       { param: "Discharge Rate", min: 0, max: 500, unit: "kW" },
@@ -164,6 +497,7 @@ export const sops = [
   },
 ];
 
+// ── Recommendations ───────────────────────────────────────────
 export const recommendations = [
   {
     id: "rec-001", title: "Optimize Chiller Sequencing for Peak Demand",
@@ -177,6 +511,9 @@ export const recommendations = [
       { name: "Peak shaving", start: "12:00", end: "16:00", action: "Switch to Chiller-2 lead, BESS discharge" },
       { name: "Recovery", start: "16:00", end: "20:00", action: "Return to standard sequencing" },
     ],
+    generatedBy: "agent-planner",
+    approvalRequired: true,
+    approvedBy: null as string | null,
   },
   {
     id: "rec-002", title: "BESS Arbitrage — Night Charging Schedule",
@@ -189,6 +526,9 @@ export const recommendations = [
       { name: "Charging", start: "02:00", end: "06:00", action: "Charge at 400kW" },
       { name: "Discharge", start: "10:00", end: "14:00", action: "Discharge at 500kW" },
     ],
+    generatedBy: "agent-planner",
+    approvalRequired: true,
+    approvedBy: "Sarah Kim",
   },
   {
     id: "rec-003", title: "Economizer Free Cooling Opportunity",
@@ -202,9 +542,13 @@ export const recommendations = [
       { name: "Free cooling", start: "21:00", end: "07:00", action: "Economizer mode" },
       { name: "Return", start: "07:00", end: "08:00", action: "Return to mechanical cooling" },
     ],
+    generatedBy: "agent-planner",
+    approvalRequired: true,
+    approvedBy: null as string | null,
   },
 ];
 
+// ── Agents ────────────────────────────────────────────────────
 export const agents = [
   {
     id: "agent-sop", name: "SOP Agent", status: "active" as const,
@@ -229,31 +573,24 @@ export const agents = [
   },
 ];
 
+// ── Audit Logs ────────────────────────────────────────────────
 export const auditLogs = [
-  { id: "a1", timestamp: "2026-03-17T16:45:00Z", action: "optimization.approved", user: "Federico Imparatta", target: "Chiller Sequencing Plan", severity: "info" as const },
+  { id: "a1", timestamp: "2026-03-17T16:45:00Z", action: "optimization.approved", user: "Sarah Kim", target: "Chiller Sequencing Plan", severity: "info" as const },
   { id: "a2", timestamp: "2026-03-17T15:30:00Z", action: "sop.version_created", user: "Mike Chen", target: "SOP-001 v3.2", severity: "info" as const },
   { id: "a3", timestamp: "2026-03-17T14:15:00Z", action: "agent.alert", user: "Asset Health Monitor", target: "Chiller-2 vibration anomaly", severity: "warning" as const },
-  { id: "a4", timestamp: "2026-03-17T12:00:00Z", action: "bess.discharge_started", user: "System", target: "BESS-1 peak shaving", severity: "info" as const },
-  { id: "a5", timestamp: "2026-03-17T10:30:00Z", action: "recommendation.denied", user: "Sarah Park", target: "Economizer Free Cooling", severity: "warning" as const },
-  { id: "a6", timestamp: "2026-03-17T08:00:00Z", action: "optimization.generated", user: "Action Planner", target: "Day-ahead optimization", severity: "info" as const },
+  { id: "a4", timestamp: "2026-03-17T12:00:00Z", action: "agent.action_approved", user: "Sarah Kim", target: "BESS Arbitrage Schedule", severity: "info" as const },
+  { id: "a5", timestamp: "2026-03-17T10:30:00Z", action: "recommendation.denied", user: "Sarah Kim", target: "Economizer Free Cooling", severity: "warning" as const },
+  { id: "a6", timestamp: "2026-03-17T08:00:00Z", action: "agent.plan_generated", user: "Action Planner", target: "Day-ahead optimization", severity: "info" as const },
   { id: "a7", timestamp: "2026-03-16T22:00:00Z", action: "bess.charge_started", user: "System", target: "BESS-1 off-peak charging", severity: "info" as const },
-  { id: "a8", timestamp: "2026-03-16T18:45:00Z", action: "sop.executed", user: "James Lee", target: "Chiller Switchover Procedure", severity: "info" as const },
+  { id: "a8", timestamp: "2026-03-16T18:45:00Z", action: "vendor.access_granted", user: "Federico Imparatta", target: "TechCool Solutions — Chiller-1, Chiller-2, CT-1", severity: "info" as const },
 ];
 
+// ── Onboarding Steps ──────────────────────────────────────────
 export const onboardingSteps = [
   { id: 1, title: "Site Overview", description: "Basic site information, location, and capacity" },
-  { id: 2, title: "People", description: "Assign operators, admins, and stakeholders" },
-  { id: 3, title: "Ontology", description: "Upload electrical one-lines, mechanical layouts" },
-  { id: 4, title: "Telemetry", description: "Configure data sources and sensor mappings" },
-  { id: 5, title: "Checks", description: "Grid connection and generation verification" },
+  { id: 2, title: "Org Hierarchy", description: "Place site within the customer's organizational structure" },
+  { id: 3, title: "Ontology", description: "Upload as-built drawings to generate equipment topology" },
+  { id: 4, title: "Telemetry", description: "Map BMS/EPMS data points to ontology nodes" },
+  { id: 5, title: "Access Control", description: "Configure RBAC, vendor access, and agent permissions" },
   { id: 6, title: "Confirm", description: "Review and activate the site" },
-];
-
-export const users = [
-  { id: "u1", name: "Federico Imparatta", email: "federico.imparatta@us.q-cells.com", role: "super_admin" as const, sites: ["dc-site-001", "dc-site-002", "dc-site-003", "dc-site-004"] },
-  { id: "u2", name: "Mike Chen", email: "mike.chen@us.q-cells.com", role: "dc_admin" as const, sites: ["dc-site-001"] },
-  { id: "u3", name: "Sarah Park", email: "sarah.park@us.q-cells.com", role: "operator" as const, sites: ["dc-site-001", "dc-site-002"] },
-  { id: "u4", name: "James Lee", email: "james.lee@us.q-cells.com", role: "operator" as const, sites: ["dc-site-001", "dc-site-003"] },
-  { id: "u5", name: "Maria Gonzalez", email: "maria.gonzalez@us.q-cells.com", role: "dc_admin" as const, sites: ["dc-site-002"] },
-  { id: "u6", name: "Tom Wilson", email: "tom.wilson@us.q-cells.com", role: "viewer" as const, sites: ["dc-site-003"] },
 ];

@@ -410,6 +410,31 @@ export default function KnowledgeGraphPage() {
               </div>
             </div>
 
+            {/* UC5: Ontology Source */}
+            {(selectedNode as { ontologySource?: string }).ontologySource && (
+              <div>
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                  Ontology Source (UC5)
+                </p>
+                <div className="space-y-2">
+                  <div className="flex justify-between py-2 px-3 bg-teal/5 rounded-lg border border-teal/10">
+                    <span className="text-sm text-slate-500">Derived From</span>
+                    <span className="text-sm font-medium text-teal-dark capitalize">
+                      {(selectedNode as { ontologySource?: string }).ontologySource?.replace(/_/g, " ")}
+                    </span>
+                  </div>
+                  {(selectedNode as { telemetrySource?: string }).telemetrySource && (
+                    <div className="flex justify-between py-2 px-3 bg-blue/5 rounded-lg border border-blue/10">
+                      <span className="text-sm text-slate-500">Telemetry</span>
+                      <span className="text-sm font-medium text-blue uppercase">
+                        {(selectedNode as { telemetrySource?: string }).telemetrySource}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Connections */}
             <div>
               <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
@@ -429,6 +454,7 @@ export default function KnowledgeGraphPage() {
                     );
                     const direction =
                       e.from === selectedNode.id ? "downstream" : "upstream";
+                    const relationship = (e as { relationship?: string }).relationship;
                     const Icon = typeIcons[targetNode?.type || ""] || Server;
                     return (
                       <button
@@ -442,7 +468,7 @@ export default function KnowledgeGraphPage() {
                             {targetNode?.label || targetId}
                           </p>
                           <p className="text-[10px] text-slate-400 uppercase tracking-wider">
-                            {direction}
+                            {direction}{relationship ? ` · ${relationship.replace(/_/g, " ")}` : ""}
                           </p>
                         </div>
                       </button>
